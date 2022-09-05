@@ -244,13 +244,11 @@ class ProgressLogger():
             main_logger.info(f'Task {i}, exit status: {exit_status}')
 
         return
-
-        
-                                                  
+                                                          
     def run_pool(self, N_worker, task, inputs, *init_args, **init_kwargs):
         '''
-        Creates a worker pool which executes the task function for all 
-        parameter in inputs.
+        Creates a worker pool which executes the task function for every 
+        input in inputs.
                                         
         :param N_worker (int): Number of worker processes
         :param task (func): task function 
@@ -280,7 +278,7 @@ class ProgressLogger():
         # Initialize main logger                           
         main_logger = self._init_main_logger(queue)                        
 
-        # Overwrite and customize if needs be  
+        # Overwrite and customize for your own purpose
         self._log_pool(main_logger, N_worker, N_tasks)
                         
         # Initialize the top-level progressbar .         
@@ -307,7 +305,7 @@ class ProgressLogger():
         # Can be overwritten and customized            
         main_logger.info(f'Results: ' + '-'*ProgressLogger.N_dash)
         
-        # Overwrite and customize if needs be
+        # Overwrite and customize for your own purpose
         self._log_results(main_logger, results)
             
         pool.close()

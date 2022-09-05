@@ -9,7 +9,7 @@ from os import path
 
 from mp_progress_logger import ProgressLogger             
             
-class ParameterGridLogger(ProgressLogger):
+class PGProgressLogger(ProgressLogger):
     '''
     Custom class to log status and progress of given task function. 
     The task function will be run for every parameter dictionary 

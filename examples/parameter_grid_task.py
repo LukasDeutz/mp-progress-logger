@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-from mp_progress_logger import ParameterGridLogger
+from mp_progress_logger import PGProgressLogger
 from parameter_scan import ParameterGrid 
 from parameter_scan.util import load_file_grid
 
@@ -115,8 +115,7 @@ if __name__ == '__main__':
                        
     PG = example_2d_grid()
 
-
-    PGL = ParameterGridLogger(PG,log_dir, experiment_spec = 'Dummy experiment')
+    PGL = PGProgressLogger(PG,log_dir, experiment_spec = 'Dummy experiment')
                         
     PGL.run_pool(N_worker, 
                  dummy_task, 
