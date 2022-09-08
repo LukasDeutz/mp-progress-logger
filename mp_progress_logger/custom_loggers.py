@@ -6,6 +6,7 @@ Created on 4 Sept 2022
 
 from os import mkdir
 from os import path
+import numpy as np
 
 from mp_progress_logger import ProgressLogger             
             
@@ -61,3 +62,74 @@ class PGProgressLogger(ProgressLogger):
         main_logger.info(f'Saved parameter grid dictionary to {fp}')
                                 
         return
+    
+    
+class FWException(Exception):
+    
+    def __init__(self, pic, T, dt, t):
+        '''
+        
+        :param pic (np.array):
+        :param T (float):
+        :param dt (float):        
+        :param t (float):
+        '''
+        
+        self.pic = pic
+        self.T = T
+        self.dt = dt
+        self.t = t
+        
+        return    
+    
+    
+class FWProgressLogger(PGProgressLogger):  
+    '''
+    Forward worm progress logger
+    
+    :param PGProgressLogger:
+    '''
+
+    def __init__(self, 
+                 PG,
+                 log_dir, 
+                 experiment_spec = 'Not specified'):                                
+        '''                
+        :param PG (parameter_scan.ParameterGrid): 
+        :param log_dir (str): directory for log files
+        :param experiment_spec (str): experiment specification  
+        '''
+
+        super().__init__(PG, log_dir, experiment_spec)
+        
+        return
+    
+    def _log_results(self, main_logger, outputs):
+                
+        for i, output in enumerate(outputs):                        
+        
+            exit_status = output['exit_status']
+            main_logger.info(f'Task {i}, exit status: {exit_status}')
+            
+            # If simulation has failed, log relevant information stored
+            # in customized exception
+            if isinstance(output['result'], Exception):
+                e = output['result']
+                pid_perc = np.sum(e.pic) / len(e.pic)                
+                t = e.t
+                T = e.T                 
+                fstr = f"{{:.{len(str(e.dt).split('.')[-1])}f}}" 
+                                
+                main_logger.info(f'Task {i}, PIC rate: {pid_perc}; simulation failed at t={fstr.format(t)}; expected simulation time was T={T}')
+            # If simulation has finished succesfully, log relevant results            
+            else:
+                result = output['result']
+                pic = result['pic']                
+                pid_perc = np.sum(pic) / len(pic)                
+                main_logger.info(f'Task {i}, PIC rate: {pid_perc}')
+                                                                                
+        return
+
+    
+    
+    
