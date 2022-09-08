@@ -169,10 +169,16 @@ class ProgressLogger():
     
     @staticmethod
     def _log_exception(e, i):
+        '''
+        
+        :param e (Exception): arbitrary exception
+        :param i (int): task number
+        '''
+        
 
         inner_logger.info(f'Task {i} failed!')                                                                                      
         inner_logger.error(f'Exception occured in task {i}:')                
-        inner_logger.exception(str(e) + '\n')
+        inner_logger.exception(e)
         #inner_logger.error('')
         
         return
@@ -180,8 +186,9 @@ class ProgressLogger():
     @staticmethod
     def _task_wrapper(input_tuple):
         '''
-        Wraps the task function. Logs the start, the end of the each task 
-        and exceptions raised within the task function.
+        Wraps the task function. Logs the start, finish and exit status of the 
+        each task. Logs exceptions raised within the task function in 
+        the error file. Equips every task with its on progressbar.
         
         :param input_tuple (tuple); (task i, _input)
                 
@@ -198,25 +205,29 @@ class ProgressLogger():
         pbar = tqdm(desc = f'TASK_{str(i).zfill(3)}:', position = worker_number, leave = False)
 
         inner_logger.info(f'Start task {i} ...')
+        
+        output = {}
                    
         try:                            
-            task(_input, 
-                 pbar, 
-                 inner_logger,
-                 i,                 
-                 *args,
-                 **kwargs)
+            result = task(_input, 
+                          pbar, 
+                          inner_logger,
+                          i,                 
+                          *args,
+                          **kwargs)
         
         except Exception as e:              
-            ProgressLogger._log_exception(e, i)                                                                                    
-            exit_status = 1                    
-        else:
+            ProgressLogger._log_exception(e, i)                                                                                                
+            output['exit_status'] = 1
+            output['result'] = e
+        else:            
             inner_logger.info(f'Finished task {i} ...')
-            exit_status = 0
-        finally:
+            output['exit_status'] = 0
+            output['result'] = result
+        finally:                                    
             pbar.close()
         
-        return exit_status 
+        return output
               
 
     def _log_pool(self, main_logger, N_worker, N_jobs):
@@ -237,11 +248,11 @@ class ProgressLogger():
         return
     
     
-    def _log_results(self, main_logger, results):
+    def _log_results(self, main_logger, outputs):
         
-        for i, exit_status in enumerate(results):                        
+        for i, output in enumerate(outputs):                        
             
-            main_logger.info(f'Task {i}, exit status: {exit_status}')
+            main_logger.info(f"Task {i}, exit status: {output['exit_status']}")
 
         return
                                                           
@@ -277,7 +288,7 @@ class ProgressLogger():
                            
         # Initialize main logger                           
         main_logger = self._init_main_logger(queue)                        
-
+        
         # Overwrite and customize for your own purpose
         self._log_pool(main_logger, N_worker, N_tasks)
                         
@@ -290,15 +301,15 @@ class ProgressLogger():
         # Create the pool and assign tasks
         pool = mp.Pool(N_worker, ProgressLogger._init_worker, initargs = (queue, lock, init_args, init_kwargs))
                                                                                                                                                 
-        results = []
+        outputs = []
 
         main_logger.info(f'Start work: ' + '-'*ProgressLogger.N_dash)
         
-        # Do the work
-        for exit_status in pool.imap(ProgressLogger._task_wrapper, zip(it.repeat(task), range(N_tasks), inputs)):
+        # Do the work    
+        for output in pool.imap(ProgressLogger._task_wrapper, zip(it.repeat(task), range(N_tasks), inputs)):
                             
             pbar.update(1)
-            results.append(exit_status)
+            outputs.append(output)
             time.sleep(0.1)
             
             
@@ -306,7 +317,7 @@ class ProgressLogger():
         main_logger.info(f'Results: ' + '-'*ProgressLogger.N_dash)
         
         # Overwrite and customize for your own purpose
-        self._log_results(main_logger, results)
+        self._log_results(main_logger, outputs)
             
         pool.close()
         pbar.close()
