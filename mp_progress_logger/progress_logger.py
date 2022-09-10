@@ -4,43 +4,56 @@ Created on 27 Aug 2022
 @author: lukas
 '''
 # Build-in import
+from os import path
+from os import mkdir
 import logging
 from logging.handlers import QueueHandler
 import multiprocessing as mp
 import itertools as it
 import time
+import io
 
 # Thid-party import
 from tqdm import tqdm
 
 class ProgressLogger():
     '''
-    Class to log and display progressbars for multiprocessing.Pool class. 
+    Class to log progress and display progressbars for multiprocessing.Pool class. 
     
-    ProgressLogger initializes and configures a logger for the main-process and
-    loggers for every worker-process. It initializes a top-level progressbar which displays the 
-    perecentage of tasks which have been already finished. It also initializes a progressbar 
-    for each worker-process which shows the progress of the task its currently working on.        
+    ProgressLogger initializes and configures a logger for the main-process and loggers 
+    for every worker-process. It initializes a top-level progressbar which displays the 
+    progress of of the taske queue, i.e. perecentage of already finished tasks. It also 
+    initializes a progressbar for each worker-process displaying the progress of the 
+    task each worker is currently working on.        
     '''    
     log_info_path = None
     log_err_path = None
-        
+    pbar_to_file = False 
+    pbar_path = None 
+    ncols = 75
+                
     N_dash = 50             
-                             
+                                             
     def __init__(self, 
                  log_info_path, 
-                 log_err_path):
+                 log_err_path,
+                 pbar_to_file = False,
+                 pbar_path = './pbars/pbars.txt'):
         '''
         
         :param log_info_path (str): info log filepath
         :param log_err_path (str): error log filepath
+        :param pbar_to_file (bool): if True, progressbars output will be written to file        
+        :param pbar_path (str): pbar filepath
         '''
  
         # log_info_path, and log_err_path need to be 
         # static variables to be accesible from within the static methods
         ProgressLogger.log_info_path  = log_info_path
         ProgressLogger.log_err_path = log_err_path 
-            
+        ProgressLogger.pbar_to_file = pbar_to_file
+        ProgressLogger.pbar_path = pbar_path
+                        
         return
         
     @staticmethod
@@ -51,6 +64,7 @@ class ProgressLogger():
         
         :param queue (mp.Queue): Logger queue
         :param lock (mp.RLock): Lock for progressbars
+        :param pbar_to_file (bool):         
         :param init_args (list): argument list 
         :param init_kwargs (dict): keyword argument dictionary
         '''
@@ -68,7 +82,16 @@ class ProgressLogger():
         
         # Set lock to avoid conflicts between parallel progress bars
         tqdm.set_lock(lock)
-                
+                 
+        if ProgressLogger.pbar_to_file:
+            f = open(ProgressLogger.pbar_path, 'r+')
+            writer = TqdmToFile(f, worker_number)
+        else: 
+            writer = None
+                 
+        global pbar_writer
+        pbar_writer = writer
+                                     
         global args
         args = init_args
         
@@ -122,7 +145,7 @@ class ProgressLogger():
         # processes do not share memory
         manager = mp.Manager()
         queue = manager.Queue()                                    
-        logger_process = mp.Process(target = ProgressLogger.log_workers, args = (queue, ))
+        logger_process = mp.Process(target = ProgressLogger._log_workers, args = (queue, ))
         logger_process.start()
         
         return logger_process, queue
@@ -141,7 +164,7 @@ class ProgressLogger():
         return main_logger
         
     @staticmethod       
-    def log_workers(queue):
+    def _log_workers(queue):
         '''
         Function which runs in the logger process. The logger process 
         waits for log records to be added to the queue by main or by 
@@ -175,20 +198,18 @@ class ProgressLogger():
         :param i (int): task number
         '''
         
-
         inner_logger.info(f'Task {i} failed!')                                                                                      
         inner_logger.error(f'Exception occured in task {i}:')                
         inner_logger.exception(e)
-        #inner_logger.error('')
         
         return
             
     @staticmethod
     def _task_wrapper(input_tuple):
         '''
-        Wraps the task function. Logs the start, finish and exit status of the 
-        each task. Logs exceptions raised within the task function in 
-        the error file. Equips every task with its on progressbar.
+        Wraps the task function. Logs the start, finish and exit status of 
+        each task. Logs exceptions raised within the task function. 
+        Equips every task with its on progressbar.
         
         :param input_tuple (tuple); (task i, _input)
                 
@@ -199,10 +220,16 @@ class ProgressLogger():
         task, i, _input = input_tuple
                 
         global inner_logger 
+        global worker_number
         global args
         global kwargs
-                       
-        pbar = tqdm(desc = f'TASK_{str(i).zfill(3)}:', position = worker_number, leave = False)
+        global pbar_writer
+        
+        pbar = tqdm(desc = f'TASK__{str(i).zfill(3)}:', 
+                    file = pbar_writer, 
+                    position = worker_number, 
+                    ncols = ProgressLogger.ncols,
+                    leave = False)
 
         inner_logger.info(f'Start task {i} ...')
         
@@ -229,6 +256,19 @@ class ProgressLogger():
         
         return output
               
+    def _init_pbar_writer(self, N_bars):
+                
+        pbar_dir = path.dirname(ProgressLogger.pbar_path)
+        
+        if not path.isdir(pbar_dir):
+            mkdir(pbar_dir)
+                        
+        f = open(ProgressLogger.pbar_path, 'w')            
+        f.writelines([' ' * TqdmToFile.max_char + '\n']*N_bars)
+
+        writer = TqdmToFile(f, 0)                     
+        
+        return writer
 
     def _log_pool(self, main_logger, N_worker, N_jobs):
         '''
@@ -296,8 +336,23 @@ class ProgressLogger():
         # The lock prevents progressbars to be updated concurrently.
         lock = mp.RLock()
         tqdm.set_lock(lock)                                                                                    
-        pbar = tqdm(total = N_tasks, desc = f'ALL TASKS:', position = 0, miniters = 1)
+
+        # If true, pbar will be written to file
+        if self.pbar_to_file:
+            pbar_writer = self._init_pbar_writer(N_worker + 1)
+        # Otherwise, pbar is directed standard output stream
+        else: 
+            pbar_writer = None
+
+        pbar = tqdm(total = N_tasks, 
+                    desc = f'ALL TASKS:', 
+                    file = pbar_writer, 
+                    position = 0, 
+                    miniters = 1,
+                    ncols = ProgressLogger.ncols)
         
+        pbar.update(0)
+                                                
         # Create the pool and assign tasks
         pool = mp.Pool(N_worker, ProgressLogger._init_worker, initargs = (queue, lock, init_args, init_kwargs))
                                                                                                                                                 
@@ -311,9 +366,7 @@ class ProgressLogger():
             pbar.update(1)
             outputs.append(output)
             time.sleep(0.1)
-            
-            
-        # Can be overwritten and customized            
+                        
         main_logger.info(f'Results: ' + '-'*ProgressLogger.N_dash)
         
         # Overwrite and customize for your own purpose
@@ -327,6 +380,37 @@ class ProgressLogger():
                 
         return
 
+class TqdmToFile(io.StringIO):
+    '''
+    Redirects progressbar updates to given file. The progressbar 
+    is written to specified line number. This is useful if we want
+    to write multiple progressbars to the same line
+    '''
+    
+    buf = ''
+    max_char = 200
+        
+    def __init__(self, file, line = 0):
+        '''                    
+        :param file (TextIOWrapper): progressbar log file 
+        :param position (int): progressbar get written to specified line 
+        '''
+        
+        self.file = file
+        self.position = line*(TqdmToFile.max_char + 1)
+        self._comparable = True
+        
+        super(TqdmToFile, self).__init__()
+    
+    def write(self, buf):        
+        self.buf = buf.strip('\r\n\t ')                        
+                
+    def flush(self):                
+        if self.buf.startswith('TASK') or self.buf.startswith('ALL'):        
+            self.file.seek(self.position)
+            self.file.write(self.buf)
+    
+    
     
     
         
