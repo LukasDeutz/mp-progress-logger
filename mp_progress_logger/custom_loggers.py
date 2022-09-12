@@ -41,14 +41,13 @@ class PGProgressLogger(ProgressLogger):
 
     def run_pool(self, N_worker, task, *init_args, **init_kwargs):
                             
-        super().run_pool(N_worker, 
-                         task, 
-                         list(zip(self.PG.param_arr, 
-                                  self.PG.hash_arr)), 
-                         *init_args, 
-                         **init_kwargs)
+        outputs  = super().run_pool(N_worker, 
+                                    task, 
+                                    list(zip(self.PG.param_mask_arr, self.PG.hash_mask_arr)), 
+                                    *init_args, 
+                                    **init_kwargs)
                 
-        return
+        return outputs
                                         
     def _log_pool(self, main_logger, N_worker, N_jobs):
         

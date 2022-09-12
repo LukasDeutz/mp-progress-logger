@@ -378,7 +378,7 @@ class ProgressLogger():
         queue.put_nowait(None)                
         logger_process.join()
                 
-        return
+        return outputs
 
 class TqdmToFile(io.StringIO):
     '''
