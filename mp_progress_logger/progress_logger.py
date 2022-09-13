@@ -356,14 +356,6 @@ class ProgressLogger():
         Additional positional and keyword arguments are kept fixed, i.e. their values 
         will be the same for all tasks.                                                         
         '''
-        
-        if not self.has_pool:
-            self.init_pool(N_worker, init_args, init_kwargs)
-                
-        N_tasks = len(inputs)
-
-        tqdm.set_lock(self.lock)                                                                                    
-                
         # If true, pbar will be written to file
         if self.pbar_to_file:
             pbar_writer, pbar_file = self._init_pbar_writer(N_worker + 1)
@@ -371,6 +363,14 @@ class ProgressLogger():
         else: 
             pbar_writer = None
             pbar_file = None
+                
+        if not self.has_pool:
+            self.init_pool(N_worker, init_args, init_kwargs)
+                
+        N_tasks = len(inputs)
+
+        tqdm.set_lock(self.lock)                                                                                    
+                
             
         pbar = tqdm(total = N_tasks, 
                     desc = f'ALL TASKS:', 
