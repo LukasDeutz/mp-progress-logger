@@ -138,7 +138,7 @@ class FWProgressLogger(PGProgressLogger):
             # in ther parameter grid for which the simulation failed
             hash_mask_arr = np.array(self.PG.hash_mask_arr)[idx_arr]      
             self.PG.apply_mask(hash_mask_arr, N = N_arr[i], dt = dt_arr[i])            
-            self.N, self.dt = N_arr[i], self.dt[i]
+            self.N, self.dt = N_arr[i], dt_arr[i]
             
             i += 1
 
