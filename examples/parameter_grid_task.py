@@ -38,9 +38,9 @@ def dummy_task(_input, pbar, logger, task_number, output_dir = 'simulations', ov
     
     
     param_dict = _input[0]
-    hash = _input[1]
+    _hash = _input[1]
     
-    file_path = path.join(output_dir, hash + '.dat')
+    file_path = path.join(output_dir, _hash + '.dat')
     
     if path.isfile(file_path):
         if not overwrite:
@@ -50,7 +50,7 @@ def dummy_task(_input, pbar, logger, task_number, output_dir = 'simulations', ov
     M = 100
     pbar.total = M
     
-    success = True # success status 
+    exit_status = True # exit_status status 
     fail_rate = 0.25 # fail rate                
 
     y_arr = np.zeros(M)
@@ -74,7 +74,7 @@ def dummy_task(_input, pbar, logger, task_number, output_dir = 'simulations', ov
                     assert False    
     
     except Exception:                                    
-            success = False
+            exit_status = False
             # Reraise exception to pass it upstream to the wrapper function
             raise 
         
@@ -84,7 +84,7 @@ def dummy_task(_input, pbar, logger, task_number, output_dir = 'simulations', ov
             
             # Write output to file
             output = {}
-            output['success'] = success
+            output['exit_status'] = exit_status
             output['y_arr'] = y_arr            
             output['x_arr'] = x_arr
             
@@ -97,7 +97,7 @@ def plot_output(PG, output_dir):
 
     for data, _hash in zip(file_grid.flatten(), PG.hash_arr):
         
-        if data['success']:
+        if ~data['exit_status']:
         
             plt.plot(data['x_arr'], data['y_arr'], label = _hash)
             
@@ -115,12 +115,14 @@ if __name__ == '__main__':
                        
     PG = example_2d_grid()
 
-    PGL = PGProgressLogger(PG,log_dir, experiment_spec = 'Dummy experiment')
+    PGL = PGProgressLogger(PG, log_dir, experiment_spec = 'Dummy experiment')
                         
-    PGL.run_pool(N_worker, 
-                 dummy_task, 
-                 output_dir = output_dir, 
-                 overwrite = True)
-                    
+    output = PGL.run_pool(N_worker, 
+                          dummy_task, 
+                          output_dir = output_dir, 
+                          overwrite = True)
+    
+    PGL.close()
+                                              
     plot_output(PG, output_dir)
     

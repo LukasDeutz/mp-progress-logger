@@ -27,12 +27,16 @@ def dummy_task(fail_rate, pbar, logger, task_number):
     
 if __name__ == '__main__':
         
-    pl = ProgressLogger('./logs/simple_info.log', './logs/simple_err.log')
+    pl = ProgressLogger('./logs/simple_info.log', 
+                        './logs/simple_err.log', 
+                        False)
     
     fail_rates = np.linspace(0, 1, 10)
     N_worker = 4
                                         
     pl.run_pool(N_worker, dummy_task, fail_rates)
-
+    pl.close()
+    
+    print('Finished Task Queue!')
 
 
