@@ -167,7 +167,6 @@ class FWProgressLogger(PGProgressLogger):
         for i, output in enumerate(outputs):                        
         
             exit_status = output['exit_status']
-            self.main_logger.info(f'Task {i}, exit status: {exit_status}')
             
             # If simulation has failed, log relevant information stored
             # in customized exception
@@ -178,13 +177,13 @@ class FWProgressLogger(PGProgressLogger):
                 T = e.T                 
                 fstr = f"{{:.{len(str(e.dt).split('.')[-1])}f}}" 
                                 
-                self.main_logger.info(f'Task {i}, PIC rate: {pid_perc}; simulation failed at t={fstr.format(t)}; expected simulation time was T={T}')
+                self.main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pid_perc}; simulation failed at t={fstr.format(t)}; expected simulation time was T={T}')
             # If simulation has finished succesfully, log relevant results            
             else:
                 result = output['result']
                 pic = result['pic']                
                 pid_perc = np.sum(pic) / len(pic)                
-                self.main_logger.info(f'Task {i}, PIC rate: {pid_perc}')
+                self.main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pid_perc}')
                                                                                 
         return
 
