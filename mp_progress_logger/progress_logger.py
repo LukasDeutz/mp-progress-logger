@@ -12,7 +12,6 @@ import multiprocessing as mp
 import itertools as it
 import time
 import io
-import numpy as np
 
 # Thid-party import
 from tqdm import tqdm
@@ -54,13 +53,11 @@ class ProgressLogger():
         ProgressLogger.log_err_path = log_err_path 
         ProgressLogger.pbar_to_file = pbar_to_file
         ProgressLogger.pbar_path = pbar_path
-
-        self.has_pool = False
                         
         return
         
     @staticmethod
-    def _init_worker(queue, lock, worker_counter, init_args, init_kwargs):
+    def _init_worker(queue, lock, init_args, init_kwargs):
         '''
         Initializes a logger for each worker process in pool. Sets a lock to 
         protect progressbars in the terminal from being updated concurrently. 
@@ -76,8 +73,7 @@ class ProgressLogger():
         global inner_logger 
         
         global worker_number         
-        worker_number = worker_counter.value 
-        worker_counter.value += 1
+        worker_number = mp.current_process()._identity[0] - 2 
         
         inner_logger = logging.getLogger(f'Worker {str(worker_number).zfill(2)}')        
         inner_logger.addHandler(logging.handlers.QueueHandler(queue))
@@ -134,10 +130,7 @@ class ProgressLogger():
         #logger.addHandler(c_handler)
     
         error_logger.setLevel(logging.INFO)
-        
-        print(f'Info Logger: {path.abspath(ProgressLogger.log_info_path)}')
-        print(f'Error Logger: {path.abspath(ProgressLogger.log_err_path)}')
-                        
+              
         return info_logger, error_logger
            
     @staticmethod       
@@ -157,7 +150,18 @@ class ProgressLogger():
         
         return logger_process, queue
            
-           
+    @staticmethod       
+    def _init_main_logger(queue):
+        '''
+        Initializes main-thread logger
+        '''
+                        
+        # Initialize and configure main-thread logger                                            
+        main_logger = logging.getLogger('main')
+        main_logger.addHandler(logging.handlers.QueueHandler(queue))
+        main_logger.setLevel(logging.INFO)
+                                
+        return main_logger
         
     @staticmethod       
     def _log_workers(queue):
@@ -252,18 +256,6 @@ class ProgressLogger():
         
         return output
               
-    def _init_main_logger(self):
-        '''
-        Initializes main-thread logger
-        '''
-                        
-        # Initialize and configure main-thread logger                                            
-        main_logger = logging.getLogger('main')
-        main_logger.addHandler(logging.handlers.QueueHandler(self.queue))
-        main_logger.setLevel(logging.INFO)
-                                
-        return main_logger
-    
     def _init_pbar_writer(self, N_bars):
                 
         pbar_dir = path.dirname(ProgressLogger.pbar_path)
@@ -276,60 +268,34 @@ class ProgressLogger():
 
         writer = TqdmToFile(f, 0)                     
         
-        return writer, f
+        return writer
 
-    def _log_task_queue(self, N_worker, N_task):
+    def _log_pool(self, main_logger, N_worker, N_jobs):
         '''
         Logs general informations at the start of the simulation.
         
+        :param main_logger (logging.Logger): main-process logger
         :param N_worker: Number of worker-processes
-        :param N_task: Number of tasks
+        :param N_jobs: Number of tasks
+        :param args: Additional positional arguments 
+        :param kwargs: Additional keyword arguments        
         '''
 
-        self.main_logger.info(f'Task Queue: ' + '-'*ProgressLogger.N_dash)
-        self.main_logger.info(f'Initialize worker pool and assign tasks') 
-        self.main_logger.info(f'Number of workers: {N_worker}')
-        self.main_logger.info(f'Total number of tasks: {N_task}')
+        main_logger.info(f'Initialize worker pool and assign tasks') 
+        main_logger.info(f'Number of workers: {N_worker}')
+        main_logger.info(f'Total number of tasks: {N_jobs}')
                  
         return
     
     
-    def _log_results(self, outputs):
-        '''
-        Logs ouput information returned by tasks. The exit status indicates if 
-        the task succeded (0) or if it failed (1). This function can be 
-        overwritten to provide additional information about output of the task 
-        function. 
-        
-        :param outputs (list): list of outputs returned task queue
-        '''
+    def _log_results(self, main_logger, outputs):
         
         for i, output in enumerate(outputs):                        
             
-            self.main_logger.info(f"Task {i}, exit status: {output['exit_status']}")
+            main_logger.info(f"Task {i}, exit status: {output['exit_status']}")
 
         return
-
-    def init_pool(self, N_worker, init_args, init_kwargs):
-
-        # Start logger process
-        self.logger_process, self.queue = self._start_logger_proccess()
-        # Initialize main logger                           
-        self.main_logger = self._init_main_logger()                        
-
-        # Initialize the top-level progressbar .         
-        # The lock prevents progressbars to be updated concurrently.
-        self.lock = mp.RLock()
-
-        worker_counter = mp.Value('l', 1)
-
-        # Create the pool and assign tasks
-        self.pool = mp.Pool(N_worker, ProgressLogger._init_worker, initargs = (self.queue, self.lock, worker_counter, init_args, init_kwargs))
-                                                                                  
-        self.has_pool = True
-
-        return
-                                                                      
+                                                          
     def run_pool(self, N_worker, task, inputs, *init_args, **init_kwargs):
         '''
         Creates a worker pool which executes the task function for every 
@@ -338,7 +304,6 @@ class ProgressLogger():
         :param N_worker (int): Number of worker processes
         :param task (func): task function 
         :param inputs (list): list of inputs
-        :param close (bool): If true, pool and logger process are closed        
         :param *init_args: additional positional arguments which will be passed to the task function           
         :param **kwargs: additional keyword arguments which will be passed to the task function                        
         
@@ -356,22 +321,29 @@ class ProgressLogger():
         Additional positional and keyword arguments are kept fixed, i.e. their values 
         will be the same for all tasks.                                                         
         '''
-        # If true, pbar will be written to file
-        if self.pbar_to_file:
-            pbar_writer, pbar_file = self._init_pbar_writer(N_worker + 1)
-        # Otherwise, pbar is directed to standard output stream
-        else: 
-            pbar_writer = None
-            pbar_file = None
-                
-        if not self.has_pool:
-            self.init_pool(N_worker, init_args, init_kwargs)
-                
         N_tasks = len(inputs)
 
-        tqdm.set_lock(self.lock)                                                                                    
-                
-            
+        # Start logger process
+        logger_process, queue = self._start_logger_proccess()
+                           
+        # Initialize main logger                           
+        main_logger = self._init_main_logger(queue)                        
+        
+        # Overwrite and customize for your own purpose
+        self._log_pool(main_logger, N_worker, N_tasks)
+                        
+        # Initialize the top-level progressbar .         
+        # The lock prevents progressbars to be updated concurrently.
+        lock = mp.RLock()
+        tqdm.set_lock(lock)                                                                                    
+
+        # If true, pbar will be written to file
+        if self.pbar_to_file:
+            pbar_writer = self._init_pbar_writer(N_worker + 1)
+        # Otherwise, pbar is directed standard output stream
+        else: 
+            pbar_writer = None
+
         pbar = tqdm(total = N_tasks, 
                     desc = f'ALL TASKS:', 
                     file = pbar_writer, 
@@ -379,45 +351,34 @@ class ProgressLogger():
                     miniters = 1,
                     ncols = ProgressLogger.ncols)
         
-        pbar.refresh()
-                        
-        # Overwrite and customize to provide problem specific information
-        self._log_task_queue(N_worker, N_tasks)
-                                                                                                                                                                                                        
+        pbar.update(0)
+                                                
+        # Create the pool and assign tasks
+        pool = mp.Pool(N_worker, ProgressLogger._init_worker, initargs = (queue, lock, init_args, init_kwargs))
+                                                                                                                                                
         outputs = []
 
-        self.main_logger.info(f'Start work: ' + '-'*ProgressLogger.N_dash)
+        main_logger.info(f'Start work: ' + '-'*ProgressLogger.N_dash)
         
         # Do the work    
-        for output in self.pool.imap(ProgressLogger._task_wrapper, zip(it.repeat(task), range(N_tasks), inputs)):
+        for output in pool.imap(ProgressLogger._task_wrapper, zip(it.repeat(task), range(N_tasks), inputs)):
                             
             pbar.update(1)
             outputs.append(output)
             time.sleep(0.1)
                         
-        self.main_logger.info(f'Results: ' + '-'*ProgressLogger.N_dash)
+        main_logger.info(f'Results: ' + '-'*ProgressLogger.N_dash)
         
-        # Overwrite and customize to provide problem specific information
-        self._log_results(outputs)
-        
-        # Close progressbar
+        # Overwrite and customize for your own purpose
+        self._log_results(main_logger, outputs)
+            
+        pool.close()
         pbar.close()
-        if pbar_file is not None: pbar_file.close()
+
+        queue.put_nowait(None)                
+        logger_process.join()
                 
         return outputs
-
-    def close(self):
-        '''
-        Clean up: Closes pool and logger process.
-        '''
-
-        self.pool.close()
-        self.queue.put_nowait(None)                
-        self.logger_process.join()
-        
-        self.has_pool = False
-
-        return
 
 class TqdmToFile(io.StringIO):
     '''

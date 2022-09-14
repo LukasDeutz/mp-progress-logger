@@ -20,14 +20,11 @@ class PGProgressLogger(ProgressLogger):
     def __init__(self, 
                  PG,
                  log_dir, 
-                 pbar_to_file = False,
-                 pbar_path = './pbars/pbars.txt',
-                 task_spec = 'Not specified'):
-        '''        
+                 experiment_spec = 'Not specified'):                                
+        '''                
         :param PG (parameter_scan.ParameterGrid): 
         :param log_dir (str): directory for log files
-        :param pbar_to_file (bool): If true, progressbars are outputted to file 
-        :param pbar_path (str): Progressbar file path        
+        :param experiment_spec (str): experiment specification  
         '''
 
         if not path.isdir(log_dir): mkdir(log_dir)
@@ -35,31 +32,33 @@ class PGProgressLogger(ProgressLogger):
         log_info_path = path.join(log_dir, PG.filename + '_info.log')    
         log_err_path =  path.join(log_dir, PG.filename + '_err.log')
 
-        super().__init__(log_info_path, log_err_path, pbar_to_file, pbar_path)
+        super().__init__(log_info_path, log_err_path)
         
         self.PG = PG
-        self.task_spec = task_spec
+        self.experiment_spec = experiment_spec
         
         return
 
     def run_pool(self, N_worker, task, *init_args, **init_kwargs):
-                                       
-        inputs = list(zip(self.PG.param_mask_arr, self.PG.hash_mask_arr))
                             
-        outputs  = super().run_pool(N_worker, task, inputs, *init_args, **init_kwargs)
+        outputs  = super().run_pool(N_worker, 
+                                    task, 
+                                    list(zip(self.PG.param_mask_arr, self.PG.hash_mask_arr)), 
+                                    *init_args, 
+                                    **init_kwargs)
                 
         return outputs
                                         
-    def _log_task_queue(self, N_worker, N_task):
+    def _log_pool(self, main_logger, N_worker, N_jobs):
         
-        super()._log_task_queue(N_worker, N_task)
+        super()._log_pool(main_logger, N_worker, N_jobs)
         
         log_dir = path.dirname(self.log_info_path)
 
         fp = self.PG.save(log_dir)
         
-        self.main_logger.info(f'Experiment: {self.task_spec}')
-        self.main_logger.info(f'Saved parameter grid dictionary to {fp}')
+        main_logger.info(f'Experiment: {self.experiment_spec}')
+        main_logger.info(f'Saved parameter grid dictionary to {fp}')
                                 
         return
     
@@ -93,80 +92,23 @@ class FWProgressLogger(PGProgressLogger):
     def __init__(self, 
                  PG,
                  log_dir, 
-                 pbar_to_file = False,
-                 pbar_path = './pbars/pbars.txt',
-                 exper_spec = 'Not specified:'):                                
-
-        '''
+                 experiment_spec = 'Not specified'):                                
+        '''                
         :param PG (parameter_scan.ParameterGrid): 
         :param log_dir (str): directory for log files
-        :param pbar_to_file (bool): If true, progressbars are outputted to file 
-        :param pbar_path (str): Progressbar file path        
-        :param exper_spec (str): Experiment specificition        
-        '''             
-        super().__init__(PG, log_dir, pbar_to_file, pbar_path, exper_spec)
-                                
-        return
-    
-    def run_pool(self, N_worker, task, *init_args, **init_kwargs):
-        
-        return PGProgressLogger.run_pool(self, N_worker, task, *init_args, **init_kwargs)
-    
-    def iterative_run_pool(self, N_worker, task, N_arr, dt_arr, *init_args, **init_kwargs):
-        
-        self.init_pool(N_worker, init_args, init_kwargs)
-               
-        self.N = self.PG.base_parameter['N']
-        self.dt = self.PG.base_parameter['dt']
-                          
-        i = 0
-        N_iter = len(N_arr)
-     
-        while True:
-                                    
-            outputs = self.run_pool(N_worker, task)                                
-            exit_status_list = [output['exit_status'] for output in outputs]            
-            # Get task indices which failed
-            idx_arr = np.array(exit_status_list) == 1
-            
-            # If all simulations succeeded or if the maximum resolution 
-            # has been reached, we break out of while loop
-            if np.all(~idx_arr) or i == N_iter:
-                break
-            
-            # Increase spatial and temporal resolution for grid points
-            # in ther parameter grid for which the simulation failed
-            hash_mask_arr = np.array(self.PG.hash_mask_arr)[idx_arr]      
-            self.PG.apply_mask(hash_mask_arr, N = N_arr[i], dt = dt_arr[i])            
-            self.N, self.dt = N_arr[i], dt_arr[i]
-            
-            i += 1
+        :param experiment_spec (str): experiment specification  
+        '''
 
-        log_dir = path.dirname(self.log_info_path)                
-        fp = self.PG.save(log_dir)
+        super().__init__(PG, log_dir, experiment_spec)
         
-        self.main_logger.info(f'Finished all task Queues: ' + '-'*ProgressLogger.N_dash)        
-        self.main_logger.info(f'Saved parameter grid dictionary to {fp}')
-         
-        self.close()
-            
-        return 
-    
-    def _log_task_queue(self, N_worker, N_task):
-        
-        # Call ProgressLoggers method directly
-        ProgressLogger._log_task_queue(self, N_worker, N_task)
-                
-        self.main_logger.info(f'Experiment: {self.task_spec}')
-        self.main_logger.info(f'Resolution: N={self.N}, dt={self.dt}')        
-                                
         return
-        
-    def _log_results(self, outputs):
+    
+    def _log_results(self, main_logger, outputs):
                 
         for i, output in enumerate(outputs):                        
         
             exit_status = output['exit_status']
+            main_logger.info(f'Task {i}, exit status: {exit_status}')
             
             # If simulation has failed, log relevant information stored
             # in customized exception
@@ -177,13 +119,13 @@ class FWProgressLogger(PGProgressLogger):
                 T = e.T                 
                 fstr = f"{{:.{len(str(e.dt).split('.')[-1])}f}}" 
                                 
-                self.main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pid_perc}; simulation failed at t={fstr.format(t)}; expected simulation time was T={T}')
+                main_logger.info(f'Task {i}, PIC rate: {pid_perc}; simulation failed at t={fstr.format(t)}; expected simulation time was T={T}')
             # If simulation has finished succesfully, log relevant results            
             else:
                 result = output['result']
                 pic = result['pic']                
                 pid_perc = np.sum(pic) / len(pic)                
-                self.main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pid_perc}')
+                main_logger.info(f'Task {i}, PIC rate: {pid_perc}')
                                                                                 
         return
 
