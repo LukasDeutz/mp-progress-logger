@@ -57,14 +57,14 @@ class ProgressLogger():
         return
         
     @staticmethod
-    def _init_worker(queue, lock, init_args, init_kwargs):
+    def _init_worker(queue, lock, worker_counter, init_args, init_kwargs):
         '''
         Initializes a logger for each worker process in pool. Sets a lock to 
         protect progressbars in the terminal from being updated concurrently. 
         
         :param queue (mp.Queue): Logger queue
         :param lock (mp.RLock): Lock for progressbars
-        :param pbar_to_file (bool):         
+        :param worker_counter (mp.Value(int): Used to assign number to worker
         :param init_args (list): argument list 
         :param init_kwargs (dict): keyword argument dictionary
         '''
@@ -73,7 +73,8 @@ class ProgressLogger():
         global inner_logger 
         
         global worker_number         
-        worker_number = mp.current_process()._identity[0] - 2 
+        worker_number = worker_counter.value
+        worker_counter.value += 1
         
         inner_logger = logging.getLogger(f'Worker {str(worker_number).zfill(2)}')        
         inner_logger.addHandler(logging.handlers.QueueHandler(queue))
@@ -354,7 +355,8 @@ class ProgressLogger():
         pbar.update(0)
                                                 
         # Create the pool and assign tasks
-        pool = mp.Pool(N_worker, ProgressLogger._init_worker, initargs = (queue, lock, init_args, init_kwargs))
+        worker_counter = mp.Value('l', 0)        
+        pool = mp.Pool(N_worker, ProgressLogger._init_worker, initargs = (queue, lock, worker_counter, init_args, init_kwargs))
                                                                                                                                                 
         outputs = []
 
