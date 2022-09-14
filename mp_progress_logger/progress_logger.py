@@ -198,6 +198,7 @@ class ProgressLogger():
         inner_logger.error(f'Exception occured in task {i}:')                
         inner_logger.exception(e)
         
+        
         return
             
     @staticmethod

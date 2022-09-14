@@ -62,27 +62,7 @@ class PGProgressLogger(ProgressLogger):
         self.main_logger.info(f'Saved parameter grid dictionary to {fp}')
                                 
         return
-    
-    
-class FWException(Exception):
-    
-    def __init__(self, pic, T, dt, t):
-        '''
         
-        :param pic (np.array):
-        :param T (float):
-        :param dt (float):        
-        :param t (float):
-        '''
-        
-        self.pic = pic
-        self.T = T
-        self.dt = dt
-        self.t = t
-        
-        return    
-    
-    
 class FWProgressLogger(PGProgressLogger):  
     '''
     Forward worm progress logger
@@ -129,11 +109,16 @@ class FWProgressLogger(PGProgressLogger):
             # Get task indices which failed
             idx_arr = np.array(exit_status_list) == 1
             
-            # If all simulations succeeded or if the maximum resolution 
-            # has been reached, we break out of while loop
-            if np.all(~idx_arr) or i == N_iter:
+            # If all simulations succeeded, break out of while loop             
+            if np.all(~idx_arr):
+                exit_status = 0
                 break
-            
+
+            # If the maximum resolution has been tryed, break out of while loop            
+            if i == N_iter:
+                exit_status = 1
+                break
+                        
             # Increase spatial and temporal resolution for grid points
             # in ther parameter grid for which the simulation failed
             hash_mask_arr = np.array(self.PG.hash_mask_arr)[idx_arr]      
@@ -145,7 +130,8 @@ class FWProgressLogger(PGProgressLogger):
         log_dir = path.dirname(self.log_info_path)                
         fp = self.PG.save(log_dir)
         
-        self.main_logger.info(f'Finished all task Queues: ' + '-'*ProgressLogger.N_dash)        
+        self.main_logger.info(f'Finished iterative task Queue: ' + '-'*ProgressLogger.N_dash)        
+        self.main_logger.info(f'Exit status: {exit_status}')        
         self.main_logger.info(f'Saved parameter grid dictionary to {fp}')
          
         self.close()
@@ -172,21 +158,50 @@ class FWProgressLogger(PGProgressLogger):
             # in customized exception
             if isinstance(output['result'], Exception):
                 e = output['result']
-                pid_perc = np.sum(e.pic) / len(e.pic)                
+                pic_rate = np.sum(e.pic) / len(e.pic)                
                 t = e.t
                 T = e.T                 
                 fstr = f"{{:.{len(str(e.dt).split('.')[-1])}f}}" 
                                 
-                self.main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pid_perc}; simulation failed at t={fstr.format(t)}; expected simulation time was T={T}')
+                self.main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pic_rate}; simulation failed at t={fstr.format(t)}; expected simulation time was T={T}')
             # If simulation has finished succesfully, log relevant results            
             else:
                 result = output['result']
                 pic = result['pic']                
-                pid_perc = np.sum(pic) / len(pic)                
-                self.main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pid_perc}')
+                pic_rate = np.sum(pic) / len(pic)                
+                self.main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pic_rate}')
                                                                                 
         return
 
+class FWException(Exception):
+    
+    def __init__(self, pic, T, dt, t):
+        '''        
+        :param pic (np.array):
+        :param pic (np.array):
+        
+        :param T (float):
+        :param dt (float):        
+        :param t (float):
+        '''
+        
+        self.pic = pic
+        self.T = T
+        self.dt = dt
+        self.t = t
+        
+        return        
+            
+    def __str__(self):
+    
+        if len(self.pic) > 10: pic = self.pic[-10:]
+        else: pic = self.pic
+    
+        return f'FWException("PIC: {pic}", "T={self.T}", t={self.t}, dt={self.dt})'        
+
+
+        
+    
     
     
     
