@@ -65,16 +65,18 @@ class PGProgressLogger(ProgressLogger):
     
 class FWException(Exception):
     
-    def __init__(self, pic, T, dt, t):
+    def __init__(self, pic_arr, pic_rate, T, dt, t):
         '''
         
-        :param pic (np.array):
+        :param pic_arr (np.array):
+        :param pic_rate (float):        
         :param T (float):
         :param dt (float):        
         :param t (float):
         '''
         
-        self.pic = pic
+        self.pic = pic_arr
+        self.pic_rate = pic_rate
         self.T = T
         self.dt = dt
         self.t = t
@@ -108,24 +110,23 @@ class FWProgressLogger(PGProgressLogger):
         for i, output in enumerate(outputs):                        
         
             exit_status = output['exit_status']
-            main_logger.info(f'Task {i}, exit status: {exit_status}')
             
             # If simulation has failed, log relevant information stored
             # in customized exception
             if isinstance(output['result'], Exception):
                 e = output['result']
-                pid_perc = np.sum(e.pic) / len(e.pic)                
-                t = e.t
+                pic_rate = e.pic_rate                
+                t = e.t                
                 T = e.T                 
                 fstr = f"{{:.{len(str(e.dt).split('.')[-1])}f}}" 
                                 
-                main_logger.info(f'Task {i}, PIC rate: {pid_perc}; simulation failed at t={fstr.format(t)}; expected simulation time was T={T}')
+                main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pic_rate}; simulation failed at t={fstr.format(t)}; expected simulation time was T={T}')
             # If simulation has finished succesfully, log relevant results            
             else:
                 result = output['result']
                 pic = result['pic']                
-                pid_perc = np.sum(pic) / len(pic)                
-                main_logger.info(f'Task {i}, PIC rate: {pid_perc}')
+                pic_rate = np.sum(pic) / len(pic)                
+                main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pic_rate}')
                                                                                 
         return
 
