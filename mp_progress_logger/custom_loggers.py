@@ -107,7 +107,7 @@ class FWProgressLogger(PGProgressLogger):
      
         while True:
                                     
-            outputs = self.run_pool(N_worker, task)                                
+            outputs = super().run_pool(N_worker, task)                                
             exit_status_list = [output['exit_status'] for output in outputs]            
             # Get task indices which failed
             idx_arr = np.array(exit_status_list) == 1
