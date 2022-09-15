@@ -87,16 +87,19 @@ class FWProgressLogger(PGProgressLogger):
         super().__init__(PG, log_dir, pbar_to_file, pbar_path, exper_spec)
                                 
         return
-    
+        
     def run_pool(self, N_worker, task, *init_args, **init_kwargs):
         
+        self.N =  self.PG.base_parameter['N']
+        self.dt = self.PG.base_parameter['dt']
+        
         return PGProgressLogger.run_pool(self, N_worker, task, *init_args, **init_kwargs)
-    
+        
     def iterative_run_pool(self, N_worker, task, N_arr, dt_arr, *init_args, **init_kwargs):
         
         self.init_pool(N_worker, init_args, init_kwargs)
                
-        self.N = self.PG.base_parameter['N']
+        self.N =  self.PG.base_parameter['N']
         self.dt = self.PG.base_parameter['dt']
                           
         i = 0
