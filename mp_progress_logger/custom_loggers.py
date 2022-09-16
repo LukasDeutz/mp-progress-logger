@@ -22,12 +22,14 @@ class PGProgressLogger(ProgressLogger):
                  log_dir, 
                  pbar_to_file = False,
                  pbar_path = './pbars/pbars.txt',
-                 task_spec = 'Not specified'):
+                 task_spec = 'Not specified',
+                 debug = False):
         '''        
         :param PG (parameter_scan.ParameterGrid): 
         :param log_dir (str): directory for log files
         :param pbar_to_file (bool): If true, progressbars are outputted to file 
         :param pbar_path (str): Progressbar file path        
+        :param debug (bool): If True, then error handling is deactivated                
         '''
 
         if not path.isdir(log_dir): mkdir(log_dir)
@@ -35,7 +37,7 @@ class PGProgressLogger(ProgressLogger):
         log_info_path = path.join(log_dir, PG.filename + '_info.log')    
         log_err_path =  path.join(log_dir, PG.filename + '_err.log')
 
-        super().__init__(log_info_path, log_err_path, pbar_to_file, pbar_path)
+        super().__init__(log_info_path, log_err_path, pbar_to_file, pbar_path, debug)
         
         self.PG = PG
         self.task_spec = task_spec
@@ -75,7 +77,8 @@ class FWProgressLogger(PGProgressLogger):
                  log_dir, 
                  pbar_to_file = False,
                  pbar_path = './pbars/pbars.txt',
-                 exper_spec = 'Not specified:'):                                
+                 exper_spec = 'Not specified:',
+                 debug = False):                                
 
         '''
         :param PG (parameter_scan.ParameterGrid): 
@@ -83,8 +86,9 @@ class FWProgressLogger(PGProgressLogger):
         :param pbar_to_file (bool): If true, progressbars are outputted to file 
         :param pbar_path (str): Progressbar file path        
         :param exper_spec (str): Experiment specificition        
+        :param debug (bool): If True, then error handling is deactivated                        
         '''             
-        super().__init__(PG, log_dir, pbar_to_file, pbar_path, exper_spec)
+        super().__init__(PG, log_dir, pbar_to_file, pbar_path, exper_spec, debug)
                                 
         return
         

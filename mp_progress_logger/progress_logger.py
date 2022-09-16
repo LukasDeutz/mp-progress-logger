@@ -32,6 +32,7 @@ class ProgressLogger():
     pbar_to_file = False 
     pbar_path = None 
     ncols = 75
+    debug = False
                 
     N_dash = 50             
                                              
@@ -39,13 +40,15 @@ class ProgressLogger():
                  log_info_path, 
                  log_err_path,
                  pbar_to_file = False,
-                 pbar_path = './pbars/pbars.txt'):
+                 pbar_path = './pbars/pbars.txt',
+                 debug = False):
         '''
         
         :param log_info_path (str): info log filepath
         :param log_err_path (str): error log filepath
         :param pbar_to_file (bool): if True, progressbars output will be written to file        
         :param pbar_path (str): pbar filepath
+        :param debug (bool): If True, then error handling is deactivated        
         '''
  
         # log_info_path, and log_err_path need to be 
@@ -54,6 +57,7 @@ class ProgressLogger():
         ProgressLogger.log_err_path = log_err_path 
         ProgressLogger.pbar_to_file = pbar_to_file
         ProgressLogger.pbar_path = pbar_path
+        ProgressLogger.debug = debug
 
         self.has_pool = False
                         
@@ -231,7 +235,16 @@ class ProgressLogger():
         inner_logger.info(f'Start task {i} ...')
         
         output = {}
-                   
+        
+        if ProgressLogger.debug:
+            
+            result = task(_input, 
+                          pbar, 
+                          inner_logger,
+                          i,                 
+                          *args,
+                          **kwargs)
+        
         try:                            
             result = task(_input, 
                           pbar, 
