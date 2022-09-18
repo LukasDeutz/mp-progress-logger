@@ -152,6 +152,11 @@ class FWProgressLogger(PGProgressLogger):
                 
         self.main_logger.info(f'Experiment: {self.task_spec}')
         self.main_logger.info(f'Resolution: N={self.N}, dt={self.dt}')        
+        
+        log_dir = path.dirname(self.log_info_path)
+        fp = self.PG.save(log_dir)
+        
+        self.main_logger.info(f'Saved parameter grid dictionary to {fp}')
                                 
         return
         
