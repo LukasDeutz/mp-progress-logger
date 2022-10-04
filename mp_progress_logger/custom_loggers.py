@@ -102,22 +102,25 @@ class FWProgressLogger(PGProgressLogger):
     def iterative_run_pool(self, N_worker, task, N_arr, dt_arr, *init_args, **init_kwargs):
         
         self.init_pool(N_worker, init_args, init_kwargs)
-               
-        self.N =  self.PG.base_parameter['N']
-        self.dt = self.PG.base_parameter['dt']
-                          
-        i = 0
+                  
+        self.PG.base_parameter['N'] = N_arr[0]
+        self.PG.base_parameter['dt'] = dt_arr[0]
+        
+        self.N = N_arr[0]
+        self.dt = dt_arr[0]
+                               
+        i = 1
         N_iter = len(N_arr)
      
         while True:
                                     
             outputs = super().run_pool(N_worker, task)                                
             exit_status_list = [output['exit_status'] for output in outputs]            
-            # Get task indices which failed
-            idx_arr = np.array(exit_status_list) == 1
+            # Get task indices of tasks which succeded
+            idx_arr = np.array(exit_status_list) == 0
             
             # If all simulations succeeded, break out of while loop             
-            if np.all(~idx_arr):
+            if np.all(idx_arr):
                 exit_status = 0
                 break
 
@@ -127,7 +130,7 @@ class FWProgressLogger(PGProgressLogger):
                 break
                         
             # Increase spatial and temporal resolution for grid points
-            # in ther parameter grid for which the simulation failed
+            # in the parameter grid for which the simulation failed
             hash_mask_arr = np.array(self.PG.hash_mask_arr)[idx_arr]      
             self.PG.apply_mask(hash_mask_arr, N = N_arr[i], dt = dt_arr[i])            
             self.N, self.dt = N_arr[i], dt_arr[i]
