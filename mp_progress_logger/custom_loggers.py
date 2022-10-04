@@ -116,11 +116,11 @@ class FWProgressLogger(PGProgressLogger):
                                     
             outputs = super().run_pool(N_worker, task)                                
             exit_status_list = [output['exit_status'] for output in outputs]            
-            # Get task indices of tasks which succeded
-            idx_arr = np.array(exit_status_list) == 0
+            # Get task indices of tasks which failed
+            idx_arr = np.array(exit_status_list) == 1
             
             # If all simulations succeeded, break out of while loop             
-            if np.all(idx_arr):
+            if np.all(np.logical_not(idx_arr)):
                 exit_status = 0
                 break
 
