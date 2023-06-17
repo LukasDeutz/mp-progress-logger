@@ -182,9 +182,10 @@ class FWProgressLogger(PGProgressLogger):
             # If simulation has finished succesfully, log relevant results            
             else:
                 result = output['result']
-                pic = result['pic']                
-                pic_rate = np.sum(pic) / len(pic)                
-                self.main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pic_rate}')
+                pic = result['pic']  
+                if result['pic'] is not None:                
+                    pic_rate = np.sum(pic) / len(pic)                
+                    self.main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pic_rate}')
                                                                                 
         return
 
