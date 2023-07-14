@@ -209,9 +209,12 @@ class FWException(Exception):
         return        
             
     def __str__(self):
-    
-        if len(self.pic) > 10: pic = self.pic[-10:]
-        else: pic = self.pic
+        
+        if pic is not None:        
+            if len(self.pic) > 10: 
+                pic = self.pic[-10:]
+            else: 
+                pic = self.pic
     
         return f'FWException("PIC: {pic}", "T={self.T}", t={self.t}, dt={self.dt})'        
 
