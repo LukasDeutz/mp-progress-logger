@@ -173,19 +173,22 @@ class FWProgressLogger(PGProgressLogger):
             # in customized exception
             if isinstance(output['result'], Exception):
                 e = output['result']
-                pic_rate = np.sum(e.pic) / len(e.pic)                
                 t = e.t
-                T = e.T                 
-                fstr = f"{{:.{len(str(e.dt).split('.')[-1])}f}}" 
-                                
-                self.main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pic_rate}; simulation failed at t={fstr.format(t)}; expected simulation time was T={T}')
-            # If simulation has finished succesfully, log relevant results            
+                T = e.T
+                fstr = f"{{:.{len(str(e.dt).split('.')[-1])}f}}"
+                self.main_logger.info(f'Task {i}, exit status: {exit_status}; simulation failed at t={fstr.format(t)}; expected simulation time was T={T}')
+                if hasattr(e, 'pic'):
+                    pic_rate = np.sum(e.pic) / len(e.pic)
+                    self.main_logger.info(f'Task {i}, PIC rate: {pic_rate}')
+            # If simulation has finished succesfully, log relevant results
             else:
                 result = output['result']
-                pic = result['pic']  
-                if result['pic'] is not None:                
-                    pic_rate = np.sum(pic) / len(pic)                
-                    self.main_logger.info(f'Task {i}, exit status: {exit_status}; PIC rate: {pic_rate}')
+                self.main_logger.info(f'Task {i}, exit status: {exit_status}')
+                if 'pic' in result:
+                    pic = result['pic']
+                    if pic is not None:
+                        pic_rate = np.sum(pic) / len(pic)
+                        self.main_logger.info(f'Task {i}; PIC rate: {pic_rate}')
                                                                                 
         return
 
